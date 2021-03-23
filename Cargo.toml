@@ -2,10 +2,10 @@
 name = "stusb4500"
 description = "STUSB4500 USB-PD Sink controller driver"
 version = "0.1.0-beta"
-authors = ["Gustav Palmqvist <gustavp@gpa-robotics.com>"]
+authors = ["Gustav Palmqvist <gustavp@gpa-robotics.com>", "Anselm Busse <anselm.busse@outlook.com>"]
 edition = "2018"
-homepage = "https://github.com/Atmelfan/stusb4500-rs"
-repository = "https://github.com/Atmelfan/stusb4500-rs"
+homepage = "https://github.com/abusse/stusb4500-rs"
+repository = "https://github.com/abusse/stusb4500-rs"
 license = "MIT/Apache-2.0"
 readme = "./README.md"
 

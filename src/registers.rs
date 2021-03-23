@@ -44,13 +44,17 @@ pub enum Register {
     RXDataObj = 0x33, //4 bytes
     TXHeaderL = 0x51,
     TXHeaderH = 0x52,
-    //0x53-0x6F, Reserved
+    RWBuffer = 0x53,
+    //0x54-0x6F, Reserved
     DPMPDONumb = 0x70,
     //0x71-0x84, Reserved
     DPMSNKPDO1 = 0x85,   //4 bytes
     DPMSNKPDO2 = 0x89,   //4 bytes
     DPMSNKPDO3 = 0x8D,   //4 bytes
     RDORegStatus = 0x91, //4 bytes
+    Password = 0x95,
+    CTRL0 = 0x96,
+    CTRL1 = 0x97,
 }
 
 bitflags! {
@@ -93,3 +97,25 @@ impl Alert {
     }
 }
 
+bitflags! {
+    pub struct CTRL0CmdMask: u8 {
+        const PWR  = 0b1000_0000;
+        const RSTN = 0b0100_0000;
+        const REQ  = 0b0001_0000;
+        const SECT = 0b0000_0111;
+
+        const _Default = Self::PWR.bits | Self::RSTN.bits | Self::REQ.bits;
+    }
+}
+
+#[repr(u8)]
+pub enum NVMCmd {
+    Read = 0x00,
+    WritePL = 0x01,
+    WriteSER = 0x02,
+    ReadPL = 0x03,
+    ReadSER = 0x04,
+    EraseSector = 0x05,
+    ProgSector = 0x06,
+    SoftProgSector = 0x07,
+}

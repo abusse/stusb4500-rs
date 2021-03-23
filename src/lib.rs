@@ -3,6 +3,9 @@
 extern crate bitflags;
 extern crate byteorder;
 extern crate embedded_hal as hal;
+extern crate std;
+
+use std::convert::TryInto;
 
 use byteorder::{ByteOrder, LittleEndian};
 use hal::blocking::i2c;
@@ -137,8 +140,119 @@ where
             _ => Err(Error::OutaRangePdo),
         }
     }
+
+    pub fn get_nvm(&mut self) -> Result<[u64; 5], Error<E>> {
+        let mut buf = [0x00; 5];
+        self.set_nvm_lock(false)?;
+        for x in 0..5 {
+            match self.read_nvm_sector(x as u8) {
+                Ok(value) => {
+                    buf[x] = value;
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        self.set_nvm_lock(true)?;
+
+        Ok(buf)
+    }
+
+    pub fn get_nvm_bytes(&mut self) -> Result<[u8; 40], Error<E>> {
+        let mut buf = [0x00; 40];
+
+        let data = self.get_nvm()?;
+        for x in 0..5 {
+            buf[x * 8..(x * 8) + 8].clone_from_slice(&(data[x].to_le_bytes()));
+        }
+
+        Ok(buf)
+    }
+
+    pub fn write_nvm(&mut self, data: [u64; 5]) -> Result<(), Error<E>> {
+        self.set_nvm_lock(false)?;
+        self.delete_nvm()?;
+        for x in 0..5 {
+            self.write_nvm_sector(x as u8, data[x])?;
+        }
+        self.set_nvm_lock(true)?;
+
+        Ok(())
+    }
+
+    pub fn write_nvm_bytes(&mut self, data: [u8; 40]) -> Result<(), Error<E>> {
+        let mut buf: [u64; 5] = [0; 5];
+
+        for x in 0..5 {
+            buf[x] = u64::from_le_bytes(data[x * 8..(x * 8) + 8].try_into().unwrap());
+        }
+
+        self.write_nvm(buf)
+    }
+
+    // *****************************************************************
+    // NVM helper functions
+
+    fn nvm_wait(&mut self) -> Result<(), Error<E>> {
+        loop {
+            match self.read(Register::CTRL0) {
+                Ok(value) => {
+                    if value & CTRL0CmdMask::REQ.bits() == 0x00 {
+                        return Ok(());
+                    }
+                }
+                Err(err) => return Err(err),
+            }
         }
     }
+
+    fn set_nvm_lock(&mut self, lock: bool) -> Result<(), Error<E>> {
+        if lock {
+            self.write(Register::Password, 0x00)?;
+        } else {
+            self.write(Register::Password, 0x47)?;
+        }
+        self.nvm_wait()
+    }
+
+    fn delete_nvm(&mut self) -> Result<(), Error<E>> {
+        self.write(Register::CTRL1, 0xFA)?;
+        self.write(Register::CTRL0, CTRL0CmdMask::_Default.bits())?;
+        self.nvm_wait()?;
+        self.write(Register::CTRL1, NVMCmd::SoftProgSector as u8)?;
+        self.write(Register::CTRL0, CTRL0CmdMask::_Default.bits())?;
+        self.nvm_wait()?;
+        self.write(Register::CTRL1, NVMCmd::EraseSector as u8)?;
+        self.write(Register::CTRL0, CTRL0CmdMask::_Default.bits())?;
+        self.nvm_wait()?;
+
+        Ok(())
+    }
+
+    fn write_nvm_sector(&mut self, sector: u8, data: u64) -> Result<(), Error<E>> {
+        self.write_double_word(Register::RWBuffer, data)?;
+        self.write(Register::CTRL1, NVMCmd::WritePL as u8)?;
+        self.write(Register::CTRL0, CTRL0CmdMask::_Default.bits())?;
+        self.nvm_wait()?;
+        self.write(Register::CTRL1, NVMCmd::ProgSector as u8)?;
+        self.write(
+            Register::CTRL0,
+            CTRL0CmdMask::_Default.bits() | (sector & CTRL0CmdMask::SECT.bits()),
+        )?;
+        self.nvm_wait()?;
+
+        Ok(())
+    }
+
+    fn read_nvm_sector(&mut self, sector: u8) -> Result<u64, Error<E>> {
+        self.write(Register::CTRL1, NVMCmd::Read as u8)?;
+        self.write(
+            Register::CTRL0,
+            CTRL0CmdMask::_Default.bits() | (sector & CTRL0CmdMask::SECT.bits()),
+        )?;
+        self.nvm_wait()?;
+        self.read_double_word(Register::RWBuffer)
+    }
+
     // *****************************************************************
     // Raw access functions
 
@@ -159,6 +273,19 @@ where
             .write(self.address, &buf)
             .map_err(|err| Error::I2CError(err))
     }
+
+    /// Write a double word register
+    pub(crate) fn write_double_word(
+        &mut self,
+        register: Register,
+        word: u64,
+    ) -> Result<(), Error<E>> {
+        let mut buf = [0x00; 9];
+        buf[0] = register as u8;
+        LittleEndian::write_u64(&mut buf[1..], word);
+        self.i2c
+            .write(self.address, &buf)
+            .map_err(|err| Error::I2CError(err))
     }
 
     /// Read a byte register
@@ -185,6 +312,17 @@ where
         Ok(LittleEndian::read_u32(&buf))
     }
 
+    /// Read a double word register
+    pub(crate) fn read_double_word(&mut self, register: Register) -> Result<u64, Error<E>> {
+        let mut buf = [0x00; 8];
+        self.i2c
+            .write(self.address, &[register as u8])
+            .map_err(|err| Error::I2CError(err))?;
+        self.i2c
+            .read(self.address, &mut buf)
+            .map_err(|err| Error::I2CError(err))?;
+        Ok(LittleEndian::read_u64(&buf))
+    }
 }
 
 #[cfg(test)]
