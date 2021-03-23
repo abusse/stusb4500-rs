@@ -41,16 +41,16 @@ pub enum Register {
     //0x30, Reserved
     RXHeaderL = 0x31,
     RXHeaderH = 0x32,
-    RXDataObj = 0x33,//4 bytes
+    RXDataObj = 0x33, //4 bytes
     TXHeaderL = 0x51,
     TXHeaderH = 0x52,
     //0x53-0x6F, Reserved
     DPMPDONumb = 0x70,
     //0x71-0x84, Reserved
-    DPMSNKPDO1 = 0x85,//4 bytes
-    DPMSNKPDO2 = 0x89,//4 bytes
-    DPMSNKPDO3 = 0x8D,//4 bytes
-    RDORegStatus = 0x91,//4 bytes
+    DPMSNKPDO1 = 0x85,   //4 bytes
+    DPMSNKPDO2 = 0x89,   //4 bytes
+    DPMSNKPDO3 = 0x8D,   //4 bytes
+    RDORegStatus = 0x91, //4 bytes
 }
 
 bitflags! {
@@ -92,3 +92,4 @@ impl Alert {
         Self::from_bits(bits & Self::_Mask.bits).unwrap()
     }
 }
+
